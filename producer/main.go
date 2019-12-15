@@ -2,18 +2,24 @@ package main
 
 import (
 	"fmt"
+
 	"gopkg.in/confluentinc/confluent-kafka-go.v1/kafka"
 )
 
 func main() {
-	p, err := kafka.NewProducer(&kafka.ConfigMap{"bootstrap.servers": "localhost"})
+	prod, err := kafka.NewProducer(&kafka.ConfigMap{"bootstrap.servers": "localhost"})
 	if err != nil {
 		panic(err)
 	}
+	fmt.Println("Sending To Consumer Broker")
+	dataConsumen := "{\"name\": \"zakar\"}"
+	producer(prod, "consumer", dataConsumen)
+	defer prod.Close()
+}
 
-	defer p.Close()
+func producer(prod *kafka.Producer, topics, word string) {
 	go func() {
-		for e := range p.Events() {
+		for e := range prod.Events() {
 			switch ev := e.(type) {
 			case *kafka.Message:
 				if ev.TopicPartition.Error != nil {
@@ -24,16 +30,11 @@ func main() {
 			}
 		}
 	}()
-
 	// Produce messages to topic (asynchronously)
-	topic := "myTopic"
-	for _, word := range []string{"Welcome", "get", "the", "Confluent", "Kafka", "Golang", "client"} {
-		p.Produce(&kafka.Message{
-			TopicPartition: kafka.TopicPartition{Topic: &topic, Partition: kafka.PartitionAny},
-			Value:          []byte(word),
-		}, nil)
-	}
-
-	// Wait for message deliveries before shutting down
-	p.Flush(15 * 1000)
+	topic := topics
+	prod.Produce(&kafka.Message{
+		TopicPartition: kafka.TopicPartition{Topic: &topic, Partition: kafka.PartitionAny},
+		Value:          []byte(word),
+	}, nil)
+	prod.Flush(15 * 1000)
 }
